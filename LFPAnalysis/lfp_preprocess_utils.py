@@ -788,7 +788,10 @@ def bipolar_ref(elec_path, bad_channels, unmatched_seeg=None, site='MSSM'):
     if site == 'MSSM':
         elec_data['bundle'] = elec_data.apply(lambda x: ''.join(i for i in x.label if not i.isdigit()), axis=1)
     elif site == 'UI':
-        elec_data['bundle'] = (elec_data['Array'] != elec_data['Array'].shift()).cumsum()
+        if any(elec_data.keys().str.contains('Array')):
+            elec_data['bundle'] = (elec_data['Array'] != elec_data['Array'].shift()).cumsum()
+        elif any(elec_data.keys().str.contains('ContactLabel')):
+            elec_data['bundle'] = (elec_data['ContactLabel'] != elec_data['ContactLabel'].shift()).cumsum()
 
     drop_from_locs = []
     for ind, data in elec_data['label'].str.lower().items(): 
@@ -1510,46 +1513,49 @@ def load_elec(elec_path=None, site='MSSM'):
         # # Get rid of unnecessary empty columns 
         # elec_data = elec_data.dropna(axis=1)
 
-        # make a manual column to assign white matter 
-        elec_data['manual'] = np.nan
-
         # Assign regions here that match keys for more detailed YBA atlas that we use for MSSM data.
 
         elec_data['salman_region'] = np.nan
+ 
+        if any(elec_data.keys().str.contains('Destrieux')):
 
-        if 'Destrieux' in elec_data.keys():
+            destr_key = elec_data.keys()[elec_data.keys().str.contains('Destrieux')].values[0]
 
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('hippocampus', na=False)] = 'HPC'
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('amygdala', na=False)] = 'AMY'
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('temporal', na=False)] = 'Temporal'
+            
+
+            # umbrella label captures some operc/triangul/orbital
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('front_inf', na=False)] = 'dlPFC'
+
+            # rename those 
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('opercular', na=False)] = 'vlPFC'
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('triangul', na=False)] = 'vlPFC'
+
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('frontopol', na=False)] = 'vmPFC'
+
+            # captures frontal gyrus and lateral, medial, orbital sulci
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('orbital', na=False)] = 'OFC'
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('rectus', na=False)] = 'OFC'
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('front_middle', na=False)] = 'dmPFC'
+            elec_data['salman_region'][elec_data[f'{destr_key}'].str.lower().str.contains('insula_ant', na=False)] = 'AINS'
+        if any(elec_data.keys().str.contains('Region')):
+            
+            # make a manual column to assign white matter 
+            elec_data['manual'] = np.nan
             # elec_data['manual'][elec_data['Destrieuxlabel'].str.lower().str.contains('white')] = 'white'
             elec_data['manual'][elec_data['Region'].str.lower().str.contains('wm', na=False)] = 'white'
-            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('outside', na=False)] = 'oob'
-            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('ventricle', na=False)] = 'oob'
-            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('lesion', na=False)] = 'oob'
-            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('cyst', na=False)] = 'oob'
-            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('bad', na=False)] = 'oob'
-
+                        
             # Get manual labels for hippocampus and amygdala 
             elec_data['salman_region'][elec_data['Region'].str.lower().str.contains('hippocampus', na=False)] = 'HPC'
             elec_data['salman_region'][elec_data['Region'].str.lower().str.contains('amygdala', na=False)] = 'AMY'
             elec_data['salman_region'][elec_data['Region'].str.lower().str.contains('temporal', na=False)] = 'Temporal'
 
-            # umbrella label captures some operc/triangul/orbital
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('front_inf', na=False)] = 'dlPFC'
 
-            # rename those 
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('opercular', na=False)] = 'vlPFC'
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('triangul', na=False)] = 'vlPFC'
-
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('frontopol', na=False)] = 'vmPFC'
-
-            # captures frontal gyrus and lateral, medial, orbital sulci
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('orbital', na=False)] = 'OFC'
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('rectus', na=False)] = 'OFC'
-
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('front_middle', na=False)] = 'dmPFC'
             # elec_data['salman_region'][elec_data['Destrieuxlabel'].str.lower().str.contains('cingul-ant')] = 'ACC'
             elec_data['salman_region'][elec_data['Region'].str.lower().str.contains('anterior cingulate', na=False)] = 'ACC'
 
-            elec_data['salman_region'][elec_data['Destrieux'].str.lower().str.contains('insula_ant', na=False)] = 'AINS'
             elec_data['salman_region'][elec_data['Region'].str.lower().str.contains('insula', na=False)] = 'AINS'
 
             # unique to Iowa: 
@@ -1558,6 +1564,15 @@ def load_elec(elec_path=None, site='MSSM'):
             elec_data['salman_region'][elec_data['Region'].str.lower().str.contains('cuneus', na=False)] = 'OCC'
 
             elec_data['salman_region'][elec_data['Region'].str.lower().str.contains('parietal', na=False)] = 'Parietal'
+       
+        if any(elec_data.keys().str.contains('Notes')):
+            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('outside', na=False)] = 'oob'
+            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('ventricle', na=False)] = 'oob'
+            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('lesion', na=False)] = 'oob'
+            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('cyst', na=False)] = 'oob'
+            elec_data['manual'][elec_data['Notes'].str.lower().str.contains('bad', na=False)] = 'oob'
+
+
 
 
 
@@ -1731,20 +1746,21 @@ seeg_only=True, check_bad=False):
             # here, the filenames are not informative. We have to get subject-specific information from the experimenter
             ncs_files = glob(f'{load_path}/LFP*.ncs')
 
-            # load the connection table .csv
-            connect_table_path = glob(f'{elec_path}/*Connection*Table*.csv')
-            if not connect_table_path: 
-                elec_table_path = glob(f'{elec_path}/*_KN.xlsx')[0]
-                seeg_names = iowa_utils.extract_names_elec_table(elec_table_path)
-                eeg_names = None
-                resp_names = None
-                ekg_names = None 
-                drop_names = None
-                # print('Manually enter the path to the Iowa connection table:')
-                # connect_table_path = glob(input())
-            else:
-                connect_table_path = connect_table_path[0]
-                eeg_names, resp_names, ekg_names, seeg_names, drop_names = iowa_utils.extract_names_connect_table(connect_table_path)
+            # load the connection table, which can come in at least three different forms from Iowa:
+            # connect_table_path = glob(f'{elec_path}/*Connection*Table*.csv')
+            eeg_names = None
+            resp_names = None
+            ekg_names = None 
+            drop_names = None
+
+            if '_KN' in elec_path: 
+                seeg_names = iowa_utils.extract_names_elec_table(elec_table_path[0])
+                # elec_table_path = glob(f'{elec_path}/*_KN.xlsx')
+            elif '_fsparc' in elec_path:
+                seeg_table = pd.read_csv(elec_path)
+                seeg_names =  [f'LFPx{ch}'.lower() for ch in seeg_table.Channel]
+            elif 'Connection' in elec_path:
+                eeg_names, resp_names, ekg_names, seeg_names, drop_names = iowa_utils.extract_names_connect_table(connect_table_path[0])
 
         if not seeg_names: 
             raise NameError('no seeg channels specified')
